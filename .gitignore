@@ -1,12 +1,65 @@
-# Byte-compiled / optimized / DLL files
+# =================================================================
+# .gitignore for Gemini Chatbot & GCP Compute Engine Project
+# =================================================================
+
+# 1. API Keys, Secrets & Environment Variables (최우선 차단)
+.env
+.env.*
+*.env
+!.env.example
+.flaskenv
+secrets/
+*.secret
+
+# 2. GCP & Cloud Provider Credentials (서비스 계정 키 및 인증 정보)
+*service_account*.json
+*service-account*.json
+*credentials*.json
+*credential*.json
+client_secret*.json
+client_secrets*.json
+application_default_credentials.json
+*-key.json
+gcp_key.json
+gcp-key.json
+adc.json
+.gcloud/
+
+# 3. SSL/TLS Certificates & Private Keys (인증서 및 개인키)
+*.pem
+*.key
+*.crt
+*.cer
+*.csr
+*.pfx
+*.p12
+*.der
+*.cert
+
+# 4. SSH Keys & Remote Access Keys (SSH 접속 키)
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+id_ecdsa
+id_ecdsa.pub
+id_dsa
+id_dsa.pub
+*.ppk
+known_hosts
+authorized_keys
+
+# 5. Jupyter Notebook Checkpoints & Cache
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+.jupyter/
+
+# 6. Python Cache & Compiled Files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
+.Python
 build/
 develop-eggs/
 dist/
@@ -24,7 +77,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environments
+# 7. Virtual Environments
 venv/
 .venv/
 env/
@@ -32,28 +85,44 @@ ENV/
 env.bak/
 venv.bak/
 
-# Environment Variables & Secrets (API Keys)
-.env
-.env.*
-!.env.example
-*.env
+# 8. Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+.mypy_cache/
+nosetests.xml
+coverage.xml
 
-# IDE & Editor Settings
+# 9. IDEs & Text Editors Settings
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
+*.swp
+*.swo
+*~
+.fleet/
 
-# Logs and databases
-*.log
-*.sqlite3
-
-# Operating System files
+# 10. OS Generated Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Temporary files & caches
+# 11. Temporary Files & Logs
+*.log
+logs/
 *.tmp
 *.temp
 .cache/
+*.bak
+*.swp
+*.orig
+
+# 12. Local SQLite & Temporary Databases
+*.sqlite3
+*.db
