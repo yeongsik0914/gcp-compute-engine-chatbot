@@ -191,3 +191,43 @@ python verify_https.py
 ```
 - **HTTPS 보안 자물쇠**: Chrome 브라우저에서 '주의 요함' 경고 없이 안전한 보안 연결 확인
 - **실시간 스트리밍 대화**: `POST /api/chat` 요청 시 토큰 실시간 전송 및 Google Search Grounding 출처 링크 정상 반환 확인
+
+---
+
+## 🧹 GCP 자원 완벽 반납 및 익일 과금 방지 가이드 (Teardown & Cleanup)
+
+실습이나 테스트를 마친 후 단순히 VM만 중지하거나 삭제할 경우, **사용자가 인지하지 못한 잔여 리소스가 백그라운드에서 계속 유료 과금을 유발**할 수 있습니다. 아래의 7대 점검 리스트와 명령어를 통해 모든 자원을 깨끗하게 반납할 수 있습니다.
+
+### ⚠️ 사용자가 놓치기 쉬운 과금 유발 7대 잔여 자원
+
+| 자원 종류 | 과금 발생 원인 | 반납 및 삭제 명령어 |
+| :--- | :--- | :--- |
+| **1. Compute VM 인스턴스** | 실행 중인 동안 vCPU 및 메모리 요금 지속 청구 | `gcloud compute instances delete <인스턴스명> --zone=<존> --quiet` |
+| **2. 미연결 영구 디스크 (Unattached Disks)** | VM 삭제 시 부팅 디스크의 `auto-delete=no`였거나 추가 디스크가 남은 경우 **GB당 월간 스토리지 요금 계속 청구** | `gcloud compute disks list --filter="users:-"`<br>`gcloud compute disks delete <디스크명> --zone=<존> --quiet` |
+| **3. 미사용 고정 공인 IP (Unused Static IPs)** | VM에 연결되지 않은 고정 IP는 **보유하고 있는 것만으로 시간당 유휴 요금 발생** | `gcloud compute addresses list --filter="status=RESERVED"`<br>`gcloud compute addresses delete <IP이름> --region=<리전> --quiet` |
+| **4. 사용자 정의 방화벽 포트 (Firewall Rules)** | 개방된 포트(5000, 80, 443 등)가 남아 있을 경우 인바운드 보안 취약점 노출 | `gcloud compute firewall-rules delete allow-chatbot-port --quiet` |
+| **5. 부하분산기 & 포워딩 규칙 (Forwarding Rules)** | 로드밸런서 및 포워딩 규칙이 남아 있을 경우 규칙당 기본 시간 요금 청구 | `gcloud compute forwarding-rules list`<br>`gcloud compute forwarding-rules delete <규칙명> --quiet` |
+| **6. 스냅샷 및 커스텀 이미지 (Snapshots & Images)** | 백업/테스트 스냅샷의 용량 요금 | `gcloud compute snapshots list`<br>`gcloud compute snapshots delete <스냅샷명> --quiet` |
+| **7. Cloud Ops Agent OS 정책 (Policy Assignments)** | VM 삭제 후 미사용 OS 설정 정책 정리 | `gcloud compute os-config os-policy-assignments delete goog-ops-agent-v2-template-1-7-0-us-central1-a --location=us-central1-a --quiet` |
+
+### 🛠️ 일괄 상태 확인 원라이너 스크립트
+
+터미널에서 아래 명령어를 실행하여 현재 프로젝트의 모든 잔여 자원 상태를 10초 만에 점검할 수 있습니다:
+
+```bash
+# 1. 실행 중인 VM 점검
+gcloud compute instances list
+
+# 2. 미연결 잔여 디스크 점검
+gcloud compute disks list --filter="-users:*"
+
+# 3. 미사용 유휴 고정 IP 점검
+gcloud compute addresses list --filter="status=RESERVED"
+
+# 4. 개방된 커스텀 방화벽 규칙 점검
+gcloud compute firewall-rules list --filter="name:allow-chatbot-port"
+```
+
+> **💡 원클릭 자동 정리**:
+> 주피터 노트북([compute_engine_example.ipynb](file:///e:/Project/gcp-compute-engine-chatbot/compute_engine_example.ipynb))의 **`## 9. GCP 자원 완벽 반납 및 익일 과금 방지 종합 정리 가이드`** 셀을 실행하면, 파이썬 기반으로 위 7대 자원을 한 번에 점검(`dry_run=True`)하거나 일괄 삭제/반납(`dry_run=False`)할 수 있습니다.
+
