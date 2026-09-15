@@ -155,3 +155,47 @@ instance-chatbot-20260915-150122  us-central1-a  e2-medium                  10.1
 - **존(Zone)**: `us-central1-a`
 - **Secret Manager 연동**: `projects/920380215419/secrets/GEMINI_API_KEY` (정상 주입 완료)
 
+---
+
+[2026-09-15 15:48:30] =================================================================
+[2026-09-15 15:48:30] HTTPS(보안 연결, SSL/TLS) 적용 작업 시작
+[2026-09-15 15:48:30] =================================================================
+
+### 8. GCP 방화벽 규칙 포트 443(HTTPS) 추가
+[2026-09-15 15:48:31] 실행 명령어: `gcloud.cmd compute firewall-rules update allow-chatbot-port --allow=tcp:5000,tcp:80,tcp:443 --project=iceu-songpa10`
+[2026-09-15 15:48:58] -> 방화벽 업데이트 완료 (허용 포트: tcp:5000, tcp:80, tcp:443)
+
+### 9. Nginx 리버스 프록시 및 Let's Encrypt 공인 SSL 인증서 발급
+[2026-09-15 15:49:30] VM 환경 구성 실행:
+1. 기존 iptables 포트 80 리다이렉션 규칙 제거
+2. Flask 백엔드 서비스를 내부 전용 포트 5001(`127.0.0.1:5001`)로 격리 및 systemd 재시작
+3. Nginx 및 Certbot 설치 (`apt-get install -y nginx certbot python3-certbot-nginx`)
+4. Let's Encrypt 공식 공인 CA 인증서 발급 완료:
+   - 인증서 도메인: `34-45-106-67.sslip.io`, `34.45.106.67.sslip.io`
+   - 인증서 저장 경로: `/etc/letsencrypt/live/34-45-106-67.sslip.io/fullchain.pem`
+   - 만료일: 2026-12-14 (자동 갱신 타이머 등록 완료)
+5. Nginx 가상 호스트 설정 및 활성화:
+   - 포트 80 (HTTP): `http://` 접속 시 `https://`로 301 자동 리다이렉트
+   - 포트 443 (기본 HTTPS): SSL 적용 및 `http://127.0.0.1:5001` 리버스 프록시
+   - 포트 5000 (HTTPS): 기존 북마크 호환을 위한 SSL 적용 및 리버스 프록시
+   - 실시간 SSE 스트리밍 버퍼링 비활성화(`proxy_buffering off;`) 적용
+
+### 10. HTTPS 서비스 검증 결과
+1. **HTTPS 기본 접속 검증 (`https://34-45-106-67.sslip.io`)**:
+   - `HTTP 200 OK` 정상 응답 (Let's Encrypt 공식 인증서 적용으로 Chrome 브라우저에서 '주의 요함' 경고 없이 안전한 자물쇠 표시)
+2. **기존 포트 5000 HTTPS 접속 검증 (`https://34-45-106-67.sslip.io:5000`)**:
+   - `HTTP 200 OK` 정상 응답
+3. **HTTP -> HTTPS 자동 리다이렉트 검증 (`http://34-45-106-67.sslip.io`)**:
+   - `HTTP 301 Moved Permanently` -> `https://34-45-106-67.sslip.io/` 리다이렉션 확인
+4. **HTTPS 상에서의 실시간 대화 및 Google Search Grounding 검증**:
+   - `POST https://34-45-106-67.sslip.io/api/chat`: Server-Sent Events 실시간 스트리밍 대화 정상 완료
+
+=================================================================
+[2026-09-15 15:55:00] HTTPS 보안 연결 전환 완료
+=================================================================
+- **공식 HTTPS 접속 URL (신뢰할 수 있는 보안 연결)**: **https://34-45-106-67.sslip.io**
+- **기존 5000 포트 HTTPS 접속 URL**: **https://34-45-106-67.sslip.io:5000**
+- **대체 HTTPS 접속 URL**: **https://34.45.106.67.sslip.io**
+- **SSL 인증서**: Let's Encrypt 공식 CA 발급 완료 (자동 갱신 설정됨)
+
+
