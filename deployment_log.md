@@ -1,0 +1,157 @@
+# GCP Compute Engine 배포 및 작업 로그
+
+- **배포 일시**: 2026-09-15 15:01:22
+- **타겟 GCP 프로젝트**: `iceu-songpa10` (Project Number: `920380215419`)
+- **타겟 리전/존**: `us-central1-a`
+- **사용자 지정 Secret Manager**: `projects/920380215419/secrets/GEMINI_API_KEY`
+
+---
+
+[2026-09-15 15:01:22] =================================================================
+[2026-09-15 15:01:22] GCP Compute Engine 프로비저닝 및 Gemini 챗봇 배포 시작
+[2026-09-15 15:01:22] =================================================================
+[2026-09-15 15:01:22] 
+[단계 1/6] Secret Manager 접근 권한 확인 및 IAM 역할 부여
+### 1. Secret Manager IAM 권한 설정
+[2026-09-15 15:01:22] 실행 명령어 (Secret Manager IAM 바인딩): gcloud.cmd secrets add-iam-policy-binding GEMINI_API_KEY --project=920380215419 --member=serviceAccount:920380215419-compute@developer.gserviceaccount.com --role=roles/secretmanager.secretAccessor
+[2026-09-15 15:01:27] -> 성공 (4.7초)
+```
+bindings:
+- members:
+  - serviceAccount:920380215419-compute@developer.gserviceaccount.com
+  role: roles/secretmanager.secretAccessor
+etag: BwZbf0f7dL4=
+version: 1
+```
+[2026-09-15 15:01:27] 
+[단계 2/6] 인바운드 방화벽 규칙 확인 및 생성 (5000, 80 포트)
+### 2. 방화벽 규칙 확인
+[2026-09-15 15:01:27] 실행 명령어 (방화벽 규칙 확인): gcloud.cmd compute firewall-rules describe allow-chatbot-port --project=iceu-songpa10
+[2026-09-15 15:01:32] -> 성공 (5.3초)
+```
+allowed:
+- IPProtocol: tcp
+  ports:
+  - '5000'
+- IPProtocol: tcp
+  ports:
+  - '80'
+creationTimestamp: '2026-09-14T22:59:14.769-07:00'
+description: ''
+direction: INGRESS
+disabled: false
+id: '1631585042851782749'
+kind: compute#firewall
+logConfig:
+  enable: false
+name: allow-chatbot-port
+network: https://www.googleapis.com/compute/v1/projects/iceu-songpa10/global/networks/default
+priority: 1000
+selfLink: https://www.googleapis.com/compute/v1/projects/iceu-songpa10/global/firewalls/allow-chatbot-port
+sourceRanges:
+- 0.0.0.0/0
+targetTags:
+- chatbot-server
+```
+[2026-09-15 15:01:32] 
+[단계 3/6] 챗봇 애플리케이션 번들 및 VM 시작 스크립트(Startup Script) 생성
+### 3. 시작 스크립트 및 번들 준비
+[2026-09-15 15:01:32] 시작 스크립트 생성 완료: E:\Project\gcp-compute-engine-chatbot\startup_script.sh (소스 번들: 24508 bytes)
+[2026-09-15 15:01:32] 
+[단계 4/6] Compute Engine 인스턴스 생성 요청: instance-chatbot-20260915-150122
+### 4. Compute Engine VM 인스턴스 프로비저닝
+[2026-09-15 15:01:32] 실행 명령어 (Compute Engine 인스턴스 생성): gcloud.cmd compute instances create instance-chatbot-20260915-150122 --project=iceu-songpa10 --zone=us-central1-a --machine-type=e2-medium --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default --metadata=enable-osconfig=TRUE --metadata-from-file=startup-script=E:\Project\gcp-compute-engine-chatbot\startup_script.sh --maintenance-policy=MIGRATE --provisioning-model=STANDARD --service-account=920380215419-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --create-disk=auto-delete=yes,boot=yes,device-name=instance-chatbot-20260915-150122,disk-resource-policy=projects/iceu-songpa10/regions/us-central1/resourcePolicies/default-schedule-1,image=projects/debian-cloud/global/images/debian-13-trixie-v20260908,mode=rw,size=10,type=pd-balanced --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --labels=goog-ops-agent-policy=v2-template-1-7-0,goog-ec-src=vm_add-gcloud --tags=http-server,https-server,chatbot-server --reservation-affinity=any
+[2026-09-15 15:01:56] -> 성공 (24.2초)
+```
+NAME                              ZONE           MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP   STATUS
+instance-chatbot-20260915-150122  us-central1-a  e2-medium                  10.128.0.4   34.45.106.67  RUNNING
+```
+[2026-09-15 15:01:56] 
+[단계 5/6] 인스턴스 공인 IP 주소 조회
+### 5. 인스턴스 IP 정보 확인
+[2026-09-15 15:01:56] 실행 명령어 (외부 IP 주소 획득): gcloud.cmd compute instances describe instance-chatbot-20260915-150122 --zone=us-central1-a --project=iceu-songpa10 --format=value(networkInterfaces[0].accessConfigs[0].natIP)
+[2026-09-15 15:02:02] -> 성공 (5.2초)
+```
+34.45.106.67
+```
+[2026-09-15 15:02:02] -> 획득한 인스턴스 외부 IP: 34.45.106.67
+[2026-09-15 15:02:02] 
+[단계 6/6] 챗봇 서비스 구동 및 헬스체크 대기 (약 1~2분 소요)
+### 6. 서비스 구동 상태 및 헬스체크
+[2026-09-15 15:02:02] -> 접속 주소 1 (기본 포트): http://34.45.106.67:5000
+[2026-09-15 15:02:02] -> 접속 주소 2 (표준 웹): http://34.45.106.67
+[2026-09-15 15:02:08] 헬스체크 시도 [1/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:02:19] 헬스체크 시도 [2/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:02:28] 헬스체크 시도 [3/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:02:37] 헬스체크 시도 [4/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:02:46] 헬스체크 시도 [5/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:02:54] 헬스체크 시도 [6/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:03:03] 헬스체크 시도 [7/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:03:12] 헬스체크 시도 [8/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:03:21] 헬스체크 시도 [9/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:03:30] 헬스체크 시도 [10/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:03:39] 헬스체크 시도 [11/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:03:48] 헬스체크 시도 [12/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:03:57] 헬스체크 시도 [13/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:04:06] 헬스체크 시도 [14/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:04:15] 헬스체크 시도 [15/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:04:24] 헬스체크 시도 [16/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:04:33] 헬스체크 시도 [17/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:04:42] 헬스체크 시도 [18/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:04:51] 헬스체크 시도 [19/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:05:00] 헬스체크 시도 [20/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:05:09] 헬스체크 시도 [21/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:05:18] 헬스체크 시도 [22/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:05:26] 헬스체크 시도 [23/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:05:35] 헬스체크 시도 [24/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:05:44] 헬스체크 시도 [25/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:05:53] 헬스체크 시도 [26/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:06:02] 헬스체크 시도 [27/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:06:11] 헬스체크 시도 [28/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:06:20] 헬스체크 시도 [29/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:06:29] 헬스체크 시도 [30/30]: http://34.45.106.67:5000/api/health
+[2026-09-15 15:06:32] [안내] VM 부팅 직후 데비안 백그라운드 apt-get lock으로 인해 시작 스크립트 대기 발생.
+[2026-09-15 15:07:10] SSH 세션을 통한 직접 환경 구성 및 systemd 서비스 등록 실행:
+- Python 가상환경 생성 (/opt/gemini-chatbot/venv)
+- 패키지 설치: flask, google-genai
+- GCP Secret Manager (`projects/920380215419/secrets/GEMINI_API_KEY`)로부터 API 키 추출 및 `/opt/gemini-chatbot/.env` 생성
+- systemd 서비스 등록 및 활성화: `gemini-chatbot.service`
+- 포트 80 -> 5000 리다이렉션 방화벽 iptables 규칙 적용
+
+[2026-09-15 15:09:40] 서비스 활성화 상태 확인:
+```
+● gemini-chatbot.service - Gemini Chatbot Web Application
+     Loaded: loaded (/etc/systemd/system/gemini-chatbot.service; enabled; preset: enabled)
+     Active: active (running) since Tue 2026-09-15 06:09:12 UTC; 28s ago
+   Main PID: 2174 (python)
+      Tasks: 2 (limit: 4668)
+     Memory: 41.7M ()
+        CPU: 1.056s
+     CGroup: /system.slice/gemini-chatbot.service
+             └─2174 /opt/gemini-chatbot/venv/bin/python /opt/gemini-chatbot/server.py
+```
+
+### 7. 배포 검증 (Verification)
+1. **모델 목록 및 API Key 구성 확인 (`GET /api/models`)**:
+   - URL: `http://34.45.106.67:5000/api/models` 및 `http://34.45.106.67/api/models`
+   - 응답: `HTTP 200 OK`, `apiKeyConfigured: True`
+   - 로드된 모델: `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3-flash-preview`
+
+2. **실시간 스트리밍 대화 검증 (`POST /api/chat`)**:
+   - 모델: `gemini-3-flash-preview`
+   - 응답: Server-Sent Events (SSE) 정상 스트리밍 응답 완료 (HTTP 200 OK)
+
+3. **Google Search Grounding 기능 검증**:
+   - 질의: 2026년 최신 AI 소식 실시간 검색
+   - 결과: Google Search Grounding 소스(yna.co.kr, investing.com 등) 정상 주입 및 최신 검색 결과 기반 답변 스트리밍 완료
+
+=================================================================
+[2026-09-15 15:22:00] GCP Compute Engine 인스턴스 배포 및 서비스 개시 완료
+=================================================================
+- **서비스 접속 URL (Port 5000)**: http://34.45.106.67:5000
+- **웹 기본 접속 URL (Port 80)**: http://34.45.106.67
+- **VM 인스턴스 이름**: `instance-chatbot-20260915-150122`
+- **GCP 프로젝트**: `iceu-songpa10` (920380215419)
+- **존(Zone)**: `us-central1-a`
+- **Secret Manager 연동**: `projects/920380215419/secrets/GEMINI_API_KEY` (정상 주입 완료)
+
