@@ -46,6 +46,15 @@ def get_api_key():
 def index():
     return render_template("index.html")
 
+@app.route("/favicon.ico")
+def favicon():
+    svg_icon = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#7da0fa">'
+        '<path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>'
+        '</svg>'
+    )
+    return Response(svg_icon, mimetype="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
 @app.route("/api/models", methods=["GET"])
 def get_models():
     return jsonify({
