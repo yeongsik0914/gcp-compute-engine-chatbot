@@ -16,15 +16,31 @@ app = Flask(
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "iceu-songpa10")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-2.5-flash"
 SUPPORTED_MODELS = [
+    {
+        "id": "gemini-2.5-flash",
+        "name": "Gemini 2.5 Flash",
+        "tag": "Flash 2.5",
+        "badge": "기본 모델 (ADC)",
+        "description": "Google Model API 초고속 멀티모달 플래시 모델, 안정적인 응답 속도",
+        "isDefault": True
+    },
+    {
+        "id": "gemini-2.5-pro",
+        "name": "Gemini 2.5 Pro",
+        "tag": "Pro 2.5",
+        "badge": "고성능 추론",
+        "description": "복잡한 추론과 분석에 특화된 고급 지능형 모델",
+        "isDefault": False
+    },
     {
         "id": "gemini-3.8-flash",
         "name": "Gemini 3.8 Flash",
         "tag": "Flash 3.8",
-        "badge": "기본 모델 (ADC)",
-        "description": "Google Model API 최신 플래그십 모델, 빠른 응답과 뛰어난 추론 능력",
-        "isDefault": True
+        "badge": "플래그십",
+        "description": "Google Model API 최신 플래그십 모델",
+        "isDefault": False
     },
     {
         "id": "gemini-3.7-flash",
@@ -32,22 +48,6 @@ SUPPORTED_MODELS = [
         "tag": "Flash 3.7",
         "badge": "고속 추론",
         "description": "효율적이고 빠른 멀티모달 플래그십 플래시 모델",
-        "isDefault": False
-    },
-    {
-        "id": "gemini-3-flash-preview",
-        "name": "Gemini 3 Flash Preview",
-        "tag": "Preview",
-        "badge": "미리보기",
-        "description": "차세대 추론 및 Agent Platform 실험 모델",
-        "isDefault": False
-    },
-    {
-        "id": "gemini-2.5-flash",
-        "name": "Gemini 2.5 Flash",
-        "tag": "Flash 2.5",
-        "badge": "안정적 모델",
-        "description": "안정적인 고효율 모델, 비용 효율적인 대화 지원",
         "isDefault": False
     }
 ]
@@ -137,15 +137,32 @@ def chat():
             )
 
             # Generate content using Vertex AI / Agent Platform with ADC
-            response = client.models.generate_content(
-                model=model,
-                contents=final_prompt,
-                config=types.GenerateContentConfig(
-                    temperature=1.0,
-                    max_output_tokens=65536,
-                    top_p=0.95,
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=final_prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=1.0,
+                        max_output_tokens=65536,
+                        top_p=0.95,
+                    )
                 )
-            )
+            except Exception as model_err:
+                if model != "gemini-2.5-flash" and ("429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err)):
+                    # Fallback to gemini-2.5-flash
+                    fallback_notice = f"> 💡 **안내**: `{model}` 모델의 일시적 사용량 한도(429)로 인해 안정적인 `Gemini 2.5 Flash` 모델로 자동 전환되어 답변합니다.\n\n"
+                    yield f"data: {json.dumps({'text': fallback_notice}, ensure_ascii=False)}\n\n"
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=final_prompt,
+                        config=types.GenerateContentConfig(
+                            temperature=1.0,
+                            max_output_tokens=65536,
+                            top_p=0.95,
+                        )
+                    )
+                else:
+                    raise model_err
 
             # Extract grounding metadata if search was used
             sources = []
