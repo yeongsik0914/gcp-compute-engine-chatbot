@@ -130,7 +130,7 @@ gcp-compute-engine-chatbot/
 │   └── static/
 │       ├── css/style.css           # Gemini 공식 다크 테마 바닐라 CSS
 │       └── js/app.js               # SSE 클라이언트, 마크다운 파서, 모델/검색 UI 제어
-├── cloud_run/                      # [NEW] GCP Cloud Run 서버리스 컨테이너 패키지
+├── cloud_run/                      # GCP Cloud Run 서버리스 컨테이너 패키지 (Secret Manager 키 방식)
 │   ├── Dockerfile                  # Python 3.11 슬림 기반 컨테이너 빌드 명세
 │   ├── .dockerignore               # 빌드 제외 파일 설정
 │   ├── requirements.txt            # 의존성 (flask, google-genai, gunicorn)
@@ -139,27 +139,39 @@ gcp-compute-engine-chatbot/
 │   ├── templates/index.html        # 웹 인터페이스 템플릿
 │   ├── static/                     # CSS 및 JS 정적 에셋
 │   └── README.md                   # Cloud Run 가이드 문서
+├── cloud_run2/                     # [NEW] GCP Cloud Run (ADC 인증 모드 - Google Cloud 권장 표준)
+│   ├── Dockerfile                  # Python 3.11 컨테이너 명세 (ADC 환경변수 사전 주입)
+│   ├── .dockerignore               # 컨테이너 빌드 제외 파일 설정
+│   ├── requirements.txt            # 의존성 (flask, google-genai, gunicorn, google-auth)
+│   ├── server.py                   # ADC(Application Default Credentials) 기반 Model API 백엔드
+│   ├── deploy_to_cloud_run.py      # ADC 모드 Cloud Run 원클릭 자동 배포 스크립트
+│   ├── templates/index.html        # 웹 인터페이스 템플릿 (ADC 뱃지 표기)
+│   ├── static/                     # CSS 및 JS 정적 에셋
+│   └── README.md                   # ADC 모드 상세 가이드 및 아키텍처 비교표
 ├── .gitignore                      # Git 추적 제외 설정 (인증서, .env, venv 등)
 └── README.md                       # 프로젝트 전체 기술 문서
 ```
 
 ---
 
-## 🔐 GCP Secret Manager 보안 연동
+## 🔐 인증 아키텍처 비교 (`cloud_run` vs `cloud_run2`)
 
-API 키를 소스코드나 서버 설정 파일에 하드코딩하지 않고, 구글 클라우드의 Secret Manager로부터 안전하게 주입받도록 구성되었습니다:
-
-- **사용된 시크릿 리소스**: `projects/920380215419/secrets/GEMINI_API_KEY`
-- **IAM 권한 설정**: Compute Engine / Cloud Run 서비스 계정에 `roles/secretmanager.secretAccessor` 역할을 부여
-- **Cloud Run 네이티브 연동**: `--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest` 플래그로 자동 주입
+| 항목 | `cloud_run` (Secret Manager 방식) | `cloud_run2` (ADC 방식 - 권장 표준) ⭐ |
+| :--- | :--- | :--- |
+| **인증 메커니즘** | `GEMINI_API_KEY` 시크릿 키 관리 | **Application Default Credentials (ADC)** |
+| **자격 증명 획득** | Secret Manager에서 런타임 환경변수 주입 | Cloud Run 런타임 메타데이터 서버 토큰 자동 획득 |
+| **초기화 코드** | `genai.Client(api_key=...)` | `genai.Client(vertexai=True, project=..., location='global')` |
+| **키 유출 위험** | API 키 탈취 시 오남용 위험 존재 | **API 키 발급/보관 자체가 없어 유출 위험 $0** |
+| **배포 명령어** | `--set-secrets GEMINI_API_KEY=...` 필수 | **시크릿 바인딩 옵션 불필요 (`--set-secrets` 제거)** |
+| **백엔드 API** | Gemini Developer API (`generativelanguage`) | Google Cloud Model API / Vertex AI (`aiplatform`) |
 
 ---
 
 ## 🚀 로컬 개발 및 실행 방법
 
-### 1. `compute_engine` 또는 `cloud_run` 디렉토리 이동 및 가상환경 설정
+### 1. `compute_engine`, `cloud_run` 또는 `cloud_run2` 디렉토리 이동 및 가상환경 설정
 ```bash
-cd cloud_run   # 또는 cd compute_engine
+cd cloud_run2   # 또는 cd cloud_run / cd compute_engine
 
 # 가상환경 생성
 python -m venv venv
@@ -173,31 +185,69 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 환경변수 설정 및 로컬 서버 실행
-```bash
-# Windows (PowerShell)
-$env:GEMINI_API_KEY="your-gemini-api-key"
-python server.py
+### 2. 로컬 서버 실행
 
-# Linux / macOS
-export GEMINI_API_KEY="your-gemini-api-key"
-python server.py
-```
+- **`cloud_run2` (ADC 모드 - API 키 불필요)**:
+  ```bash
+  # 로컬 ADC 자격 증명 1회 생성 (이미 로그인된 경우 생략 가능)
+  gcloud auth application-default login
+  
+  # 서버 실행
+  python server.py
+  ```
+
+- **`cloud_run` / `compute_engine` (API 키 필요)**:
+  ```bash
+  # Windows (PowerShell)
+  $env:GEMINI_API_KEY="your-gemini-api-key"
+  python server.py
+
+  # Linux / macOS
+  export GEMINI_API_KEY="your-gemini-api-key"
+  python server.py
+  ```
 
 웹 브라우저에서 `http://localhost:8080` (Cloud Run) 또는 `http://localhost:5000` (Compute Engine)으로 접속합니다.
 
 ---
 
-## ☁️ 배포 옵션 1: Google Cloud Run 서버리스 배포 (권장: Scale-to-Zero, $0 유휴 비용)
+## ☁️ 배포 옵션 1: Google Cloud Run 2 (ADC 인증 모드 - 권장 표준)
 
-로컬에 Docker 데스크톱이 없어도 GCP Cloud Build가 클라우드 상에서 컨테이너를 자동 빌드하여 안전하게 배포합니다:
+API 키나 Secret Manager 설정 없이, Cloud Run에 부여된 서비스 계정 신원(ADC)으로 안전하게 배포합니다:
+
+```bash
+cd cloud_run2
+python deploy_to_cloud_run.py
+```
+
+또는 수동 `gcloud` 명령어 실행:
+```bash
+cd cloud_run2
+gcloud run deploy gemini-chatbot-adc \
+  --source . \
+  --project=iceu-songpa10 \
+  --region=us-central1 \
+  --platform=managed \
+  --allow-unauthenticated \
+  --service-account=920380215419-compute@developer.gserviceaccount.com \
+  --set-env-vars=GOOGLE_CLOUD_PROJECT=iceu-songpa10,GOOGLE_CLOUD_LOCATION=global \
+  --timeout=300 \
+  --memory=512Mi \
+  --cpu=1 \
+  --min-instances=0 \
+  --max-instances=3
+```
+
+---
+
+## ☁️ 배포 옵션 2: Google Cloud Run 1 (Secret Manager 방식)
 
 ```bash
 cd cloud_run
 python deploy_to_cloud_run.py
 ```
 
-또는 수동 `gcloud` 명령어 실행:
+또는 수동 `gcloud` 명령어:
 ```bash
 gcloud run deploy gemini-chatbot \
   --source . \
