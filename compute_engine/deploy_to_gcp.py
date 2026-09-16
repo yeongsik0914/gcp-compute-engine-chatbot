@@ -80,13 +80,19 @@ def build_app_payload():
     files_to_pack = [
         "server.py",
         "requirements.txt",
-        "templates/index.html",
-        "static/css/style.css",
-        "static/js/app.js"
     ]
+    collected_files = set(files_to_pack)
+    for folder in ["templates", "static"]:
+        folder_path = os.path.join(SCRIPT_DIR, folder)
+        if os.path.exists(folder_path):
+            for root, _, files in os.walk(folder_path):
+                for f in files:
+                    rel = os.path.relpath(os.path.join(root, f), SCRIPT_DIR).replace(os.sep, "/")
+                    collected_files.add(rel)
+
     tar_buf = io.BytesIO()
     with tarfile.open(fileobj=tar_buf, mode="w:gz") as tar:
-        for rel_path in files_to_pack:
+        for rel_path in sorted(collected_files):
             full_path = os.path.join(SCRIPT_DIR, rel_path.replace("/", os.sep))
             if os.path.exists(full_path):
                 tar.add(full_path, arcname=rel_path)
@@ -193,7 +199,7 @@ def main():
     run_cmd(iam_cmd, "Secret Manager IAM 바인딩")
 
     # Step 2: 방화벽 규칙 확인/생성
-    log("\n[단계 2/6] 인바운드 방화벽 규칙 확인 및 생성 (5000, 80 포트)")
+    log("\n[단계 2/6] 인바운드 방화벽 규칙 확인 및 생성 (5000, 80, 443 포트)")
     log_markdown("### 2. 방화벽 규칙 확인")
     fw_check_cmd = [
         "gcloud", "compute", "firewall-rules", "describe", FIREWALL_RULE,
@@ -208,7 +214,7 @@ def main():
             "--priority=1000",
             "--network=default",
             "--action=ALLOW",
-            "--rules=tcp:5000,tcp:80",
+            "--rules=tcp:5000,tcp:80,tcp:443",
             "--source-ranges=0.0.0.0/0",
             f"--target-tags=chatbot-server"
         ]

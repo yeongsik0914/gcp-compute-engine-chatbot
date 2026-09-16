@@ -116,20 +116,24 @@ graph TD
 
 ```
 gcp-compute-engine-chatbot/
-├── server.py                   # Flask 백엔드 서버 (Gemini API 호출 및 SSE 스트리밍)
-├── requirements.txt            # 파이썬 의존성 (flask, google-genai)
-├── setup_https.sh              # VM 내 HTTPS/Nginx/Let's Encrypt 자동 구성 스크립트
-├── deploy_to_gcp.py            # GCP Compute Engine 프로비저닝 자동화 스크립트
-├── verify_https.py             # HTTPS 엔드포인트 및 리다이렉션 검증 스크립트
-├── deployment_log.md           # 전체 배포 및 HTTPS 구성 상세 실행 로그
-├── templates/
-│   └── index.html              # 시맨틱 마크업 웹 인터페이스
-├── static/
-│   ├── css/
-│   │   └── style.css           # Gemini 공식 다크 테마 바닐라 CSS
-│   └── js/
-│       └── app.js              # SSE 클라이언트, 마크다운 파서, 모델/검색 UI 제어
-└── README.md                   # 프로젝트 전체 기술 문서
+├── compute_engine/                 # GCP Compute Engine 챗봇 및 배포/보안 설정 패키지
+│   ├── server.py                   # Flask 백엔드 서버 (Gemini API 호출 및 SSE 스트리밍)
+│   ├── requirements.txt            # 파이썬 의존성 (flask, google-genai)
+│   ├── deploy_to_gcp.py            # GCP Compute Engine 프로비저닝 자동화 스크립트
+│   ├── startup_script.sh           # VM 시작 스크립트 (번들 압축 해제 및 systemd 서비스 등록)
+│   ├── setup_https.sh              # VM 내 HTTPS/Nginx/Let's Encrypt 자동 구성 스크립트
+│   ├── verify_https.py             # HTTPS 엔드포인트 및 리다이렉션 검증 스크립트
+│   ├── compute_engine_example.ipynb # VM 프로비저닝 & Cloud Ops Agent 실습 노트북
+│   ├── deployment_log.md           # 전체 배포 및 HTTPS 구성 상세 실행 로그
+│   ├── templates/
+│   │   └── index.html              # 시맨틱 마크업 웹 인터페이스
+│   └── static/
+│       ├── css/
+│       │   └── style.css           # Gemini 공식 다크 테마 바닐라 CSS
+│       └── js/
+│           └── app.js              # SSE 클라이언트, 마크다운 파서, 모델/검색 UI 제어
+├── .gitignore                      # Git 추적 제외 설정 (인증서, .env, venv 등)
+└── README.md                       # 프로젝트 전체 기술 문서
 ```
 
 ---
@@ -146,18 +150,23 @@ API 키를 소스코드나 서버 설정 파일에 하드코딩하지 않고, �
 
 ## 🚀 로컬 개발 및 실행 방법
 
-### 1. 가상환경 생성 및 의존성 설치
+### 1. `compute_engine` 디렉토리 이동 및 가상환경 설정
 ```bash
+cd compute_engine
+
+# 가상환경 생성
 python -m venv venv
-# Windows:
+
+# 가상환경 활성화 (Windows)
 venv\Scripts\activate
-# Linux/macOS:
+# 가상환경 활성화 (Linux/macOS)
 source venv/bin/activate
 
+# 의존성 패키지 설치
 pip install -r requirements.txt
 ```
 
-### 2. 환경변수 설정 및 실행
+### 2. 환경변수 설정 및 로컬 서버 실행
 ```bash
 # Windows (PowerShell)
 $env:GEMINI_API_KEY="your-gemini-api-key"
@@ -168,16 +177,27 @@ export GEMINI_API_KEY="your-gemini-api-key"
 python server.py
 ```
 
-브라우저에서 `http://localhost:5000`으로 접속합니다.
+웹 브라우저에서 `http://localhost:5000`으로 접속합니다.
+
+---
+
+## ☁️ GCP Compute Engine 자동 프로비저닝 및 배포
+
+`compute_engine/deploy_to_gcp.py`를 실행하면 VM 인스턴스 생성, 방화벽(5000, 80, 443) 개방, 소스코드 번들링 및 자동 배포가 원클릭으로 수행됩니다:
+
+```bash
+cd compute_engine
+python deploy_to_gcp.py
+```
 
 ---
 
 ## 🧪 검증 및 상태 확인
 
-배포된 Compute Engine 인스턴스에 대해 다음 자동화 검증이 완료되었습니다:
+배포된 Compute Engine 인스턴스에 대해 다음 자동화 검증을 실행할 수 있습니다:
 
 ```bash
-python verify_https.py
+python compute_engine/verify_https.py
 ```
 
 **검증 출력 결과**:
