@@ -205,7 +205,7 @@ gcloud run deploy gemini-chatbot \
   --region=us-central1 \
   --platform=managed \
   --allow-unauthenticated \
-  --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
+  --set-secrets=GEMINI_API_KEY=projects/920380215419/secrets/GEMINI_API_KEY:latest \
   --timeout=300 \
   --memory=512Mi \
   --cpu=1 \

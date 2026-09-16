@@ -17,6 +17,7 @@ REGION = "us-central1"
 SERVICE_NAME = "gemini-chatbot"
 SERVICE_ACCOUNT = f"{PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 SECRET_ID = "GEMINI_API_KEY"
+SECRET_FULL_NAME = f"projects/{PROJECT_NUMBER}/secrets/{SECRET_ID}"
 
 def log(msg, to_console=True):
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -68,7 +69,7 @@ def main():
         f.write(f"- **GCP 프로젝트**: `{PROJECT_ID}` (Project Number: `{PROJECT_NUMBER}`)\n")
         f.write(f"- **타겟 리전**: `{REGION}`\n")
         f.write(f"- **서비스명**: `{SERVICE_NAME}`\n")
-        f.write(f"- **Secret Manager 키**: `{SECRET_ID}`\n\n---\n\n")
+        f.write(f"- **Secret Manager 키**: `{SECRET_FULL_NAME}`\n\n---\n\n")
 
     log("=================================================================")
     log("GCP Cloud Run 서버리스 컨테이너 빌드 및 배포 시작")
@@ -110,7 +111,7 @@ def main():
         f"--region={REGION}",
         "--platform=managed",
         "--allow-unauthenticated",
-        f"--set-secrets=GEMINI_API_KEY={SECRET_ID}:latest",
+        f"--set-secrets=GEMINI_API_KEY={SECRET_FULL_NAME}:latest",
         "--timeout=300",
         "--memory=512Mi",
         "--cpu=1",
@@ -176,7 +177,7 @@ def main():
         log("=================================================================")
         log(f"🌐 공식 보안 HTTPS URL: {service_url}")
         log(f"🏷️ 서비스명: {SERVICE_NAME} (Region: {REGION})")
-        log(f"🔑 Secret Manager 연동: {SECRET_ID}")
+        log(f"🔑 Secret Manager 연동: {SECRET_FULL_NAME}")
         log(f"⚡ 스케일링 정책: Scale-to-Zero (min: 0, max: 3)")
         log("=================================================================")
 
@@ -189,7 +190,7 @@ def main():
 | **리전** | `{REGION}` |
 | **공식 HTTPS 접속 주소** | **[{service_url}]({service_url})** |
 | **SSL/TLS 인증서** | 구글 관리형 공식 TLS 자동 적용 (HTTPS 기본 지원) |
-| **Secret Manager 키** | `{SECRET_ID}` (컨테이너 환경변수로 자동 주입) |
+| **Secret Manager 키** | `{SECRET_FULL_NAME}` (컨테이너 환경변수로 자동 주입) |
 | **지원 모델** | Gemini 3.8 Flash, Gemini 3.7 Flash, Gemini 3 Flash Preview |
 | **실시간 검색** | Google Search Grounding 활성화 |
 | **오토스케일링** | `0 ~ 3 인스턴스` (Scale-to-Zero 지원, 유휴 시 $0) |
