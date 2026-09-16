@@ -116,7 +116,7 @@ graph TD
 
 ```
 gcp-compute-engine-chatbot/
-├── compute_engine/                 # GCP Compute Engine 챗봇 및 배포/보안 설정 패키지
+├── compute_engine/                 # GCP Compute Engine 챗봇 및 VM 배포/보안 설정 패키지
 │   ├── server.py                   # Flask 백엔드 서버 (Gemini API 호출 및 SSE 스트리밍)
 │   ├── requirements.txt            # 파이썬 의존성 (flask, google-genai)
 │   ├── deploy_to_gcp.py            # GCP Compute Engine 프로비저닝 자동화 스크립트
@@ -128,10 +128,17 @@ gcp-compute-engine-chatbot/
 │   ├── templates/
 │   │   └── index.html              # 시맨틱 마크업 웹 인터페이스
 │   └── static/
-│       ├── css/
-│       │   └── style.css           # Gemini 공식 다크 테마 바닐라 CSS
-│       └── js/
-│           └── app.js              # SSE 클라이언트, 마크다운 파서, 모델/검색 UI 제어
+│       ├── css/style.css           # Gemini 공식 다크 테마 바닐라 CSS
+│       └── js/app.js               # SSE 클라이언트, 마크다운 파서, 모델/검색 UI 제어
+├── cloud_run/                      # [NEW] GCP Cloud Run 서버리스 컨테이너 패키지
+│   ├── Dockerfile                  # Python 3.11 슬림 기반 컨테이너 빌드 명세
+│   ├── .dockerignore               # 빌드 제외 파일 설정
+│   ├── requirements.txt            # 의존성 (flask, google-genai, gunicorn)
+│   ├── server.py                   # Cloud Run 환경 ($PORT) 최적화 백엔드
+│   ├── deploy_to_cloud_run.py      # Cloud Build 및 Cloud Run 원클릭 자동 배포 스크립트
+│   ├── templates/index.html        # 웹 인터페이스 템플릿
+│   ├── static/                     # CSS 및 JS 정적 에셋
+│   └── README.md                   # Cloud Run 가이드 문서
 ├── .gitignore                      # Git 추적 제외 설정 (인증서, .env, venv 등)
 └── README.md                       # 프로젝트 전체 기술 문서
 ```
@@ -143,16 +150,16 @@ gcp-compute-engine-chatbot/
 API 키를 소스코드나 서버 설정 파일에 하드코딩하지 않고, 구글 클라우드의 Secret Manager로부터 안전하게 주입받도록 구성되었습니다:
 
 - **사용된 시크릿 리소스**: `projects/920380215419/secrets/GEMINI_API_KEY`
-- **IAM 권한 설정**: Compute Engine 기본 서비스 계정(`920380215419-compute@developer.gserviceaccount.com`)에 `roles/secretmanager.secretAccessor` 역할을 부여
-- **VM 인스턴스 스코프**: `--scopes=https://www.googleapis.com/auth/cloud-platform` 적용을 통해 VM 부팅 및 애플리케이션 시작 시 안전하게 API 키를 획득
+- **IAM 권한 설정**: Compute Engine / Cloud Run 서비스 계정에 `roles/secretmanager.secretAccessor` 역할을 부여
+- **Cloud Run 네이티브 연동**: `--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest` 플래그로 자동 주입
 
 ---
 
 ## 🚀 로컬 개발 및 실행 방법
 
-### 1. `compute_engine` 디렉토리 이동 및 가상환경 설정
+### 1. `compute_engine` 또는 `cloud_run` 디렉토리 이동 및 가상환경 설정
 ```bash
-cd compute_engine
+cd cloud_run   # 또는 cd compute_engine
 
 # 가상환경 생성
 python -m venv venv
@@ -177,11 +184,38 @@ export GEMINI_API_KEY="your-gemini-api-key"
 python server.py
 ```
 
-웹 브라우저에서 `http://localhost:5000`으로 접속합니다.
+웹 브라우저에서 `http://localhost:8080` (Cloud Run) 또는 `http://localhost:5000` (Compute Engine)으로 접속합니다.
 
 ---
 
-## ☁️ GCP Compute Engine 자동 프로비저닝 및 배포
+## ☁️ 배포 옵션 1: Google Cloud Run 서버리스 배포 (권장: Scale-to-Zero, $0 유휴 비용)
+
+로컬에 Docker 데스크톱이 없어도 GCP Cloud Build가 클라우드 상에서 컨테이너를 자동 빌드하여 안전하게 배포합니다:
+
+```bash
+cd cloud_run
+python deploy_to_cloud_run.py
+```
+
+또는 수동 `gcloud` 명령어 실행:
+```bash
+gcloud run deploy gemini-chatbot \
+  --source . \
+  --project=iceu-songpa10 \
+  --region=us-central1 \
+  --platform=managed \
+  --allow-unauthenticated \
+  --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
+  --timeout=300 \
+  --memory=512Mi \
+  --cpu=1 \
+  --min-instances=0 \
+  --max-instances=3
+```
+
+---
+
+## 🖥️ 배포 옵션 2: GCP Compute Engine 가상머신 배포
 
 `compute_engine/deploy_to_gcp.py`를 실행하면 VM 인스턴스 생성, 방화벽(5000, 80, 443) 개방, 소스코드 번들링 및 자동 배포가 원클릭으로 수행됩니다:
 
